@@ -1,6 +1,6 @@
 """Pydantic models for YAML recognizer configurations."""
 
-from typing import Any, Dict, List, Literal, Optional, Type, Union
+from typing import Annotated, Any, Dict, List, Literal, Optional, Type, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -195,10 +195,10 @@ class TextChunkerConfig(BaseModel):
         return self
 
 
-class ContextAwareEnhancerConfig(BaseModel):
-    """Validated configuration for the analyzer's context-aware enhancer.
+class ContextAwareEnhancerSettingsConfig(BaseModel):
+    """Validated settings of a lemma or phrase context-aware enhancer.
 
-    Omitted fields keep the ``LemmaContextAwareEnhancer`` constructor defaults.
+    Omitted fields keep the enhancer constructor defaults.
 
     :param context_similarity_factor: How much to enhance confidence of a match.
     :param min_score_with_context_similarity: Minimum confidence score
@@ -234,6 +234,42 @@ class ContextAwareEnhancerConfig(BaseModel):
         """
         kwargs.setdefault("exclude_none", True)
         return super().model_dump(*args, **kwargs)
+
+
+class LemmaContextAwareEnhancerConfig(ContextAwareEnhancerSettingsConfig):
+    """A ``LemmaContextAwareEnhancer`` in the ``enhancers`` list."""
+
+    type: Literal["lemma"]
+
+
+class PhraseContextAwareEnhancerConfig(ContextAwareEnhancerSettingsConfig):
+    """A ``PhraseContextAwareEnhancer`` in the ``enhancers`` list."""
+
+    type: Literal["phrase"]
+
+
+class ContextAwareEnhancerConfig(ContextAwareEnhancerSettingsConfig):
+    """Validated configuration for the analyzer's context-aware enhancer.
+
+    The analyzer runs a ``CompositeContextAwareEnhancer``. Without ``enhancers``,
+    it holds a ``LemmaContextAwareEnhancer`` and a ``PhraseContextAwareEnhancer``.
+    With ``enhancers``, it holds the listed enhancers in order. The settings given
+    here apply to every enhancer, and an entry's own settings override them.
+
+    :param enhancers: The enhancers to run in order, each with a ``type``
+    of "lemma" or "phrase" and its settings.
+    """
+
+    enhancers: Optional[
+        List[
+            Annotated[
+                Union[
+                    LemmaContextAwareEnhancerConfig, PhraseContextAwareEnhancerConfig
+                ],
+                Field(discriminator="type"),
+            ]
+        ]
+    ] = Field(None, min_length=1, description="Enhancers to run in order")
 
 
 class PredefinedRecognizerConfig(BaseRecognizerConfig):
